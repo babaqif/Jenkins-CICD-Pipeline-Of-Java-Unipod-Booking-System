@@ -1,26 +1,59 @@
 pipeline {
-      agent any
-      stages {
-            stage('Init') {
-                  steps {
-                        echo 'Hi, this is Anshul from LevelUp360'
-                        echo 'We are Starting the Testing'
-                  }
+    agent any
+
+    environment {
+        GIT_CREDENTIALS = credentials('github-credentials')  // Reference to Jenkins stored credentials
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                script {
+                    // Clone the GitHub repository using Jenkins credentials
+                    checkout([$class: 'GitSCM', branches: [[name: '*/main']], 
+                        doGenerateSubmoduleConfigurations: false, 
+                        extensions: [], 
+                        userRemoteConfigs: [[url: 'https://github.com/unipod-inc/Unipod-booking-System.git', credentialsId: 'github-credentials']]])
+                }
             }
-            stage('Build') {
-                  steps {
-                        echo 'Building Sample Maven Project'
-                  }
+        }
+
+        stage('Build') {
+            steps {
+                // Execute the Maven build
+                script {
+                    sh 'mvn clean package'
+                }
             }
-            stage('Deploy') {
-                  steps {
-                        echo "Deploying in Staging Area"
-                  }
+        }
+
+        stage('Test') {
+            steps {
+                // Publish test results
+                junit '**/target/surefire-reports/*.xml'
             }
-            stage('Deploy Production') {
-                  steps {
-                        echo "Deploying in Production Area"
-                  }
+        }
+
+        stage('Archive') {
+            steps {
+                // Archive JAR files
+                archiveArtifacts '**/target/*.jar'
             }
-      }
+        }
+
+        stage('Notify') {
+            steps {
+                // Send email notification on failure
+                mail to: 'qthmichaels@gmail.com',
+                     subject: "Build ${currentBuild.fullDisplayName} failed",
+                     body: "The build has failed. Please check Jenkins for more details."
+            }
+        }
+    }
+
+    post {
+        always {
+            echo 'Build completed'
+        }
+    }
 }
